@@ -43,7 +43,7 @@ CARD_OUTPUT_DIR = _CURRENT_DIR / "card_cache"
     PLUGIN_NAME,
     "17qxm",
     "乐队群专用：网易云卡片 / 每日推歌挑战 / 打卡统计，附 WebUI 管理面板",
-    "0.1.0",
+    "0.2.0",
 )
 class FloydPlugin(Star):
     """主插件类。"""
