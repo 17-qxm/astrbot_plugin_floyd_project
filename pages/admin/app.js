@@ -21,9 +21,10 @@ function toast(msg, isErr = false) {
 }
 
 // bridge apiGet/apiPost 在 reject 时返回的 err 形态不一，统一处理。
+// 注意：bridge endpoint 不能含 query string，GET 的查询参数走 params。
 async function api(method, endpoint, body) {
   try {
-    if (method === "GET") return await bridge.apiGet(endpoint);
+    if (method === "GET") return await bridge.apiGet(endpoint, body);
     if (method === "DELETE") return await bridge.apiPost(endpoint, body || {});
     return await bridge.apiPost(endpoint, body || {});
   } catch (e) {
@@ -244,7 +245,7 @@ async function loadRank() {
   const body = $("rank-body");
   body.innerHTML = '<tr><td colspan="4" class="loading">加载中…</td></tr>';
   try {
-    const data = await safe(api("GET", "checkin/rank?by=" + by + "&limit=20"), "加载排行失败");
+    const data = await safe(api("GET", "checkin/rank", { by, limit: 20 }), "加载排行失败");
     const rank = data.rank || [];
     if (!rank.length) {
       body.innerHTML = '<tr><td colspan="4" class="empty-state">还没有打卡记录</td></tr>';

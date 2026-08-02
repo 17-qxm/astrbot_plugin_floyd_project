@@ -254,6 +254,7 @@ async def _render_summary_card(
         return await plugin.html_render(tmpl, data, return_url=False)
     except Exception as e:  # noqa: BLE001
         logger.error(f"[scheduler] 总结卡片渲染失败: {e}")
+        logger.error(traceback.format_exc())
         return None
 
 

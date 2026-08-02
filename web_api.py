@@ -66,11 +66,27 @@ class WebAPI:
 
     async def challenges_create(self):
         body = await request.get_json(silent=True) or {}
+        # 带 idx 走更新，不带走新增
+        if body.get("idx") is not None:
+            return await self.challenges_update(body)
         text = (body.get("text") or "").strip()
         if not text:
             return _err("text 不能为空")
         source = body.get("source") or challenge_mod.SOURCE_MANUAL
         return _ok(self.manager.add(text, source=source))
+
+    async def challenges_update(self, body=None):
+        """更新指定 idx 的文案。body: {idx, text}"""
+        body = body if body is not None else (await request.get_json(silent=True) or {})
+        try:
+            idx = int(body.get("idx"))
+        except (TypeError, ValueError):
+            return _err("idx 必须是整数")
+        text = (body.get("text") or "").strip()
+        if not text:
+            return _err("text 不能为空")
+        res = self.manager.update(idx, text)
+        return _ok(res) if res else _err("idx 不存在", 404)
 
     async def challenges_import(self):
         """批量导入：body 形如 {texts:[...]} 或 {raw:"多行文本", mode:"append|replace"}。"""

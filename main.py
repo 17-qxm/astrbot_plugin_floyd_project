@@ -243,8 +243,18 @@ class FloydPlugin(Star):
     @filter.command("summary")
     async def summary(self, event: AstrMessageEvent):
         """手动查看当日打卡总结。"""
-        text = await scheduler_mod.build_summary_text(self.checkin_store)
-        yield event.plain_result(text)
+        cfg = self._scheduler_cfg()
+        if cfg.get("auto_summary_image"):
+            today = date.today()
+            today_data = await self.checkin_store.get_today_sorted(today)
+            checkins = today_data.get("checkins", [])
+            stats = await self.checkin_store.get_stats()
+            image_path = await scheduler_mod._render_summary_card(self, today, checkins, stats)
+            if image_path:
+                yield event.image_result(image_path)
+                return
+        # 图片渲染失败或关闭时，回落纯文本
+        yield event.plain_result(await scheduler_mod.build_summary_text(self.checkin_store))
 
     @filter.command("weekly")
     async def weekly(self, event: AstrMessageEvent):

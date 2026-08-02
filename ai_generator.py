@@ -75,11 +75,23 @@ async def generate_batch(
 
     prompt = (custom_prompt or DEFAULT_BATCH_PROMPT).format(count=count)
     logger.info(f"[ai_generator] 批量生成 {count} 条，provider={provider}")
-    resp = await context.llm_generate(provider, prompt)
-    raw = getattr(resp, "completion_text", None) or str(resp)
+    try:
+        resp = await context.llm_generate(provider, prompt)
+    except Exception as e:  # noqa: BLE001 — 把真实错误透传给前端
+        logger.error(f"[ai_generator] llm_generate 调用失败: {e}")
+        import traceback
+        logger.error(traceback.format_exc())
+        raise RuntimeError(f"LLM 调用失败: {e}") from e
+    # 多种字段名兜底：不同版本/返回结构兼容
+    raw = (
+        getattr(resp, "completion_text", None)
+        or getattr(resp, "content", None)
+        or getattr(resp, "text", None)
+        or str(resp)
+    )
     lines = parse_lines(raw)[:count]
     added = manager.add_many(lines, source=challenge_mod.SOURCE_AI)
-    logger.info(f"[ai_generator] 生成完成，入库 {added} 条")
+    logger.info(f"[ai_generator] 生成完成，入库 {added} 条，原始长度 {len(raw)}")
     return {"added": added, "provider": provider, "raw": raw}
 
 
@@ -103,7 +115,12 @@ async def generate_daily(
     except Exception as e:  # noqa: BLE001
         logger.error(f"[ai_generator] 每日生成失败: {e}")
         return None
-    raw = getattr(resp, "completion_text", None) or str(resp)
+    raw = (
+        getattr(resp, "completion_text", None)
+        or getattr(resp, "content", None)
+        or getattr(resp, "text", None)
+        or str(resp)
+    )
     lines = parse_lines(raw)
     if not lines:
         return None
