@@ -24,6 +24,11 @@ PLUGIN_DIR = Path(__file__).resolve().parent
 SUMMARY_TEMPLATE = PLUGIN_DIR / "templates" / "daily_summary.html"
 WEEKLY_TEMPLATE = PLUGIN_DIR / "templates" / "weekly_summary.html"
 
+# html_render 截图参数：JPEG 最高质量 + 设备像素比渲染，避免文字模糊。
+# AstrBot 默认是 quality=40 的 JPEG，对文字密集的总结卡片糊到没法看。
+# 注：scale 仅支持 "css"/"device"（无数值倍数），device 已是最高清晰度。
+RENDER_OPTIONS = {"full_page": True, "type": "jpeg", "quality": 100, "scale": "device"}
+
 UMO_KEY_PREFIX = "umo:"          # group_id -> 缓存的 umo
 PUSHED_KEY_PREFIX = "pushed:"    # <date>:<kind> -> "1" 防重复
 
@@ -251,7 +256,7 @@ async def _render_summary_card(
             "checkins": checkins,
             "total_users": len(stats.get("users", {})),
         }
-        return await plugin.html_render(tmpl, data, return_url=False)
+        return await plugin.html_render(tmpl, data, return_url=False, options=RENDER_OPTIONS)
     except Exception as e:  # noqa: BLE001
         logger.error(f"[scheduler] 总结卡片渲染失败: {e}")
         logger.error(traceback.format_exc())
@@ -288,7 +293,7 @@ async def render_weekly_card(plugin: Any, *, end: Optional[date] = None) -> Opti
     try:
         week = await plugin.checkin_store.get_week(end)
         tmpl = WEEKLY_TEMPLATE.read_text(encoding="utf-8")
-        return await plugin.html_render(tmpl, week, return_url=False)
+        return await plugin.html_render(tmpl, week, return_url=False, options=RENDER_OPTIONS)
     except Exception as e:  # noqa: BLE001
         logger.error(f"[scheduler] 周报卡片渲染失败: {e}")
         return None
