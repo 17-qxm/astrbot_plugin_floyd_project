@@ -1,0 +1,151 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Floyd 管理面板</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <div class="app">
+      <div class="topbar">
+        <h1>🎸 Floyd 乐队群</h1>
+        <span class="sub">推歌挑战管理面板</span>
+        <span class="state-pill" id="state-pill">加载中…</span>
+      </div>
+
+      <nav class="tabs">
+        <button class="tab" data-route="challenges">挑战文案</button>
+        <button class="tab" data-route="stats">打卡统计</button>
+        <button class="tab" data-route="tools">工具</button>
+      </nav>
+
+      <!-- ===== 挑战文案 ===== -->
+      <section id="view-challenges" class="view hidden">
+        <div class="card">
+          <div class="card-title">新增文案</div>
+          <div class="card-desc">添加一条「每日推歌挑战」主题。顺序模式下按列表顺序逐日轮播，列表耗尽后循环。</div>
+          <div class="row">
+            <input type="text" id="ch-input" placeholder="例如：一首让你想起夏天的歌" />
+            <button class="primary narrow" id="ch-add-btn">添加</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">批量导入 / 导出</div>
+          <div class="card-desc">
+            粘贴多行文本，每行一条；或上传 .txt 文件。
+            <label><input type="radio" name="import-mode" value="append" checked /> 追加</label>
+            <label><input type="radio" name="import-mode" value="replace" /> 覆盖全部</label>
+          </div>
+          <textarea id="ch-bulk" placeholder="一首让你单曲循环的歌&#10;一首带「风」字的歌&#10;…"></textarea>
+          <div class="btn-row">
+            <input type="file" id="ch-file" accept=".txt" hidden />
+            <button id="ch-upload-btn">上传 .txt</button>
+            <button id="ch-import-btn">导入文本框</button>
+            <button id="ch-export-btn">导出 .txt</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">AI 一键生成</div>
+          <div class="card-desc">调用 AstrBot 当前 LLM 批量生成主题。需在插件配置 <code>gen_provider</code> 或保证有可用 provider。</div>
+          <div class="row">
+            <label class="narrow" style="flex:0 0 auto;">生成条数</label>
+            <input type="number" id="gen-count" class="narrow" value="10" min="1" max="100" />
+            <button class="primary" id="gen-btn">开始生成</button>
+          </div>
+          <details style="margin-top:12px;">
+            <summary class="muted" style="font-size:13px;cursor:pointer;">自定义提示词（可选）</summary>
+            <textarea id="gen-prompt" style="margin-top:10px;" placeholder="留空则用默认模板。可用 {count} 占位。"></textarea>
+          </details>
+          <pre id="gen-result" class="muted" style="margin-top:10px;font-size:12px;white-space:pre-wrap;display:none;"></pre>
+        </div>
+
+        <div class="card">
+          <div class="list-head">
+            <span>文案库（<b id="ch-count">0</b> 条）</span>
+            <span>点击 ✎ 编辑，✕ 删除</span>
+          </div>
+          <ul class="ch-list" id="ch-list">
+            <li class="loading">加载中…</li>
+          </ul>
+        </div>
+      </section>
+
+      <!-- ===== 打卡统计 ===== -->
+      <section id="view-stats" class="view hidden">
+        <div class="card">
+          <div class="card-title">总览</div>
+          <div class="stats-grid" id="stats-grid">
+            <div class="stat"><div class="big" id="s-total">-</div><div class="lbl">累计总打卡</div></div>
+            <div class="stat"><div class="big" id="s-users">-</div><div class="lbl">参与人数</div></div>
+            <div class="stat"><div class="big" id="s-today">-</div><div class="lbl">今日打卡</div></div>
+            <div class="stat"><div class="big" id="s-streak">-</div><div class="lbl">最长连续(天)</div></div>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="card-title">打卡热力图（近 90 天）</div>
+          <div class="card-desc">颜色越深表示当日打卡人数越多。</div>
+          <div class="heatmap" id="heatmap"></div>
+          <div class="heat-legend">
+            <span>少</span>
+            <span class="swatches">
+              <span style="background:var(--panel-2);border:1px solid var(--border-soft);"></span>
+              <span style="background:#2a3a6b;"></span>
+              <span style="background:#3d5bb0;"></span>
+              <span style="background:#5b7fd6;"></span>
+              <span style="background:var(--accent);"></span>
+            </span>
+            <span>多</span>
+          </div>
+        </div>
+
+        <div class="card">
+          <div class="list-head">
+            <span class="card-title" style="margin:0;">排行榜</span>
+            <select id="rank-by" class="narrow" style="flex:0 0 130px;">
+              <option value="total">总打卡数</option>
+              <option value="streak">当前连续</option>
+              <option value="max_streak">最长连续</option>
+            </select>
+          </div>
+          <table class="rank-table">
+            <thead><tr><th class="pos">#</th><th>成员</th><th class="num">数值</th><th>上次打卡</th></tr></thead>
+            <tbody id="rank-body"><tr><td colspan="4" class="loading">加载中…</td></tr></tbody>
+          </table>
+        </div>
+
+        <div class="card">
+          <div class="card-title">今日歌单</div>
+          <ul class="ch-list" id="today-list"><li class="loading">加载中…</li></ul>
+        </div>
+      </section>
+
+      <!-- ===== 工具 ===== -->
+      <section id="view-tools" class="view hidden">
+        <div class="card">
+          <div class="card-title">数据自愈</div>
+          <div class="card-desc">根据历史打卡记录重新计算所有人的统计（总次数 / 连续天数）。在数据异常或手动改过 KV 后使用。</div>
+          <button id="rebuild-btn">重算统计</button>
+        </div>
+        <div class="card">
+          <div class="card-title">插件状态</div>
+          <pre id="state-box" class="muted" style="font-size:12px;white-space:pre-wrap;">加载中…</pre>
+        </div>
+        <div class="card">
+          <div class="card-title">说明</div>
+          <div class="card-desc">
+            · 打卡规则：在打卡群发送网易云分享并成功生成卡片，即记为当天一次（每人每天最多 1 次）。<br/>
+            · UMO 捕获：定时推送需要插件先「见过」目标群的消息。请在目标群发任意一条消息，让插件记录 unified_msg_origin。<br/>
+            · 文案来源标记：manual / import / ai。
+          </div>
+        </div>
+      </section>
+    </div>
+
+    <div class="toast" id="toast"></div>
+    <script type="module" src="./app.js"></script>
+  </body>
+</html>

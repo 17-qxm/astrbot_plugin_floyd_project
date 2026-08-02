@@ -1,0 +1,58 @@
+{
+    "target_groups": {
+        "description": "目标群号",
+        "type": "list",
+        "items": { "type": "string" },
+        "hint": "既是打卡群（发网易云分享计打卡），也是推歌/每日/周报的推送目标",
+        "default": []
+    },
+    "push_time": {
+        "description": "每日推歌时间（服务器时区）",
+        "type": "string",
+        "hint": "格式 HH:MM，如 08:00、12:30",
+        "default": "08:00"
+    },
+    "summary_time": {
+        "description": "每日总结时间（服务器时区）",
+        "type": "string",
+        "hint": "格式 HH:MM，默认 22:00 自动发送当日打卡汇总",
+        "default": "22:00"
+    },
+    "weekly_time": {
+        "description": "每周总结时间（服务器时区）",
+        "type": "string",
+        "hint": "格式 HH:MM，默认 22:30 在每周指定日发送本周汇总",
+        "default": "22:30"
+    },
+    "weekly_day": {
+        "description": "每周总结发送日",
+        "type": "int",
+        "hint": "1=周一 ... 7=周日，默认 7（周日）",
+        "default": 7
+    },
+    "challenge_mode": {
+        "description": "推歌文案来源模式",
+        "type": "string",
+        "hint": "sequential：按文案库顺序轮播；daily_ai：每天用 AI 现生成一条",
+        "default": "sequential",
+        "options": ["sequential", "daily_ai"]
+    },
+    "challenge_start_date": {
+        "description": "推歌挑战 Day1 起算日期",
+        "type": "string",
+        "hint": "格式 YYYY-MM-DD，如 2026-04-13",
+        "default": "2026-04-13"
+    },
+    "gen_provider": {
+        "description": "AI 生成文案使用的 LLM Provider",
+        "type": "string",
+        "hint": "留空则回落到任意会话的当前 provider",
+        "_special": "select_provider"
+    },
+    "auto_summary_image": {
+        "description": "每日总结渲染为图片",
+        "type": "bool",
+        "hint": "关闭则发送纯文本总结",
+        "default": true
+    }
+}

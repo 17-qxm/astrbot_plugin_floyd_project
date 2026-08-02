@@ -1,0 +1,134 @@
+{# 每日打卡总结卡片（html_render → PNG 发群）。
+   每首歌一张带封面模糊背景的卡片，按打卡时间（早→晚）排序，不排名。
+   data: { date, count, total_users, checkins:[{name,song,artist,cover_url,time}] } #}
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8" />
+<style>
+  @font-face { font-family: 'LocalSans'; src: url('../Harmonyossans.ttf') format('truetype'); }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: 'LocalSans', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+    background: #0f1226; color: #e7e9f3; width: 720px; padding: 28px 40px;
+  }
+  .header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
+  .title { font-size: 30px; font-weight: 700; }
+  .date { font-size: 18px; color: #9aa0c0; }
+  .subtitle { color: #8b91b5; font-size: 14px; margin-bottom: 18px; }
+
+  .stat-row { display: flex; gap: 16px; margin-bottom: 20px; }
+  .stat-card { flex: 1; background: #1a1f3d; border-radius: 16px; padding: 18px 24px; border: 1px solid #2a3158; }
+  .stat-num { font-size: 42px; font-weight: 800; color: #7c9cff; line-height: 1; }
+  .stat-label { font-size: 15px; color: #9aa0c0; margin-top: 8px; }
+
+  .section-title { font-size: 18px; font-weight: 600; margin: 4px 0 16px; color: #cdd2ee; }
+
+  .list { display: flex; flex-direction: column; gap: 8px; }
+
+  /* 单首歌卡片：封面模糊铺底 + 暗化遮罩 + 内容层 */
+  .song {
+    position: relative; height: 108px; border-radius: 14px; overflow: hidden;
+    border: 1px solid #2a3158;
+  }
+  .song-bg {
+    position: absolute; inset: 0;
+    background-size: cover; background-position: center;
+    filter: blur(26px) saturate(1.3); transform: scale(1.18);
+  }
+  .song-shade { position: absolute; inset: 0; background: rgba(15, 18, 38, 0.42); }
+  .song-body { position: relative; display: flex; align-items: center; gap: 14px; height: 100%; padding: 0 16px; }
+  .cover {
+    width: 84px; height: 84px; border-radius: 10px; overflow: hidden; flex-shrink: 0;
+    background: #1a1f3d; box-shadow: 0 4px 12px rgba(0,0,0,.45);
+  }
+  .cover img { width: 100%; height: 100%; object-fit: cover; display: block; }
+  .meta { flex: 1; min-width: 0; }
+  .song-name {
+    font-size: 20px; font-weight: 700; color: #fff;
+    text-shadow: 0 2px 8px rgba(0,0,0,.6);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .artist {
+    font-size: 14px; color: #d7daf0; margin-top: 4px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    text-shadow: 0 1px 4px rgba(0,0,0,.6);
+  }
+  .recommender {
+    flex-shrink: 0; display: flex; flex-direction: column; align-items: flex-end; gap: 8px;
+  }
+  .time {
+    font-size: 13px; color: #fff; font-weight: 600;
+    padding: 4px 10px; border-radius: 8px;
+    background: rgba(124,156,255,0.45);
+    backdrop-filter: blur(8px) saturate(1.4);
+    -webkit-backdrop-filter: blur(8px) saturate(1.4);
+    border: 1px solid rgba(255,255,255,0.25);
+    box-shadow: 0 2px 8px rgba(0,0,0,0.25);
+  }
+  .by {
+    font-size: 13px; color: #c9cde8; display: flex; align-items: center; gap: 7px;
+    text-shadow: 0 1px 4px rgba(0,0,0,.6);
+  }
+  .by .lbl { color: #9aa0c0; }
+  .by .name { font-weight: 600; color: #fff; }
+  .avatar {
+    width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex-shrink: 0;
+    background: #2a3158; border: 1.5px solid rgba(255,255,255,0.6);
+  }
+
+  .empty { text-align: center; color: #8b91b5; padding: 48px 0; font-size: 16px; line-height: 1.8; }
+  .footer { margin-top: 32px; font-size: 12px; color: #6b7196; text-align: center; }
+</style>
+</head>
+<body>
+  <div class="header">
+    <div class="title">📊 每日打卡总结</div>
+    <div class="date">{{ date }}</div>
+  </div>
+  <div class="subtitle">今日歌单 · 共 {{ count }} 首</div>
+
+  <div class="stat-row">
+    <div class="stat-card"><div class="stat-num">{{ count }}</div><div class="stat-label">今日打卡</div></div>
+    <div class="stat-card"><div class="stat-num">{{ total_users }}</div><div class="stat-label">累计参与</div></div>
+  </div>
+
+  <div class="section-title">今日分享（按时间）</div>
+  {% if checkins %}
+  <div class="list">
+    {% for c in checkins %}
+    <div class="song">
+      {% if c.cover_url %}
+      <div class="song-bg" style="background-image:url('{{ c.cover_url }}')"></div>
+      {% else %}
+      <div class="song-bg" style="background:#1a1f3d"></div>
+      {% endif %}
+      <div class="song-shade"></div>
+      <div class="song-body">
+        <div class="cover">
+          {% if c.cover_url %}<img src="{{ c.cover_url }}" />{% endif %}
+        </div>
+        <div class="meta">
+          <div class="song-name">{{ c.song }}</div>
+          <div class="artist">{{ c.artist }}</div>
+        </div>
+        <div class="recommender">
+          <div class="time">{{ c.time }}</div>
+          <div class="by">
+            <span class="lbl">由</span>
+            {% if c.uid %}<img class="avatar" src="https://q.qlogo.cn/headimg_dl?dst_uin={{ c.uid }}&spec=140&img_type=jpg" />{% endif %}
+            <span class="name">{{ c.name }}</span>
+            <span class="lbl">推荐</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    {% endfor %}
+  </div>
+  {% else %}
+  <div class="empty">今天还没有人打卡 🎵<br/>快来分享第一首歌吧！</div>
+  {% endif %}
+
+  <div class="footer">Floyd · 乐队群每日推歌挑战</div>
+</body>
+</html>
