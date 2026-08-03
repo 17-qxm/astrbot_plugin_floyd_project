@@ -32,19 +32,12 @@ import card_service
 import challenge as challenge_mod
 import checkin as checkin_mod
 import scheduler as scheduler_mod
-import web_api
+from webui import web_api
 from netease import extract_song_id
 
 PLUGIN_NAME = "astrbot_plugin_floyd_project"
 CARD_OUTPUT_DIR = _CURRENT_DIR / "card_cache"
 
-
-@register(
-    PLUGIN_NAME,
-    "17qxm",
-    "乐队群专用：网易云卡片 / 每日推歌挑战 / 打卡统计，附 WebUI 管理面板",
-    "0.3.0",
-)
 class FloydPlugin(Star):
     """主插件类。"""
 
@@ -102,7 +95,7 @@ class FloydPlugin(Star):
             web_api.register_delete_route(self)
             logger.info("[floyd] WebUI 路由已注册")
         except Exception as e:  # noqa: BLE001 — register_web_api 在低版本可能不存在
-            logger.warning(f"[floyd] WebUI 路由注册失败（可能 AstrBot 版本不支持）: {e}")
+            logger.info(f"[floyd] WebUI 路由注册失败（可能 AstrBot 版本不支持）: {e}")
 
         # 启动定时任务。
         cfg = self._scheduler_cfg()
@@ -156,6 +149,7 @@ class FloydPlugin(Star):
 
         sender_id = event.get_sender_id()
         sender_name = event.get_sender_name()
+        logger.info(f"[floyd] 收到网易云分享：群={group_id} 用户={sender_name}({sender_id}) 歌曲id={song_id}")
         result = await card_service.generate_song_card(
             song_id,
             recommender=sender_name,
@@ -166,6 +160,7 @@ class FloydPlugin(Star):
             yield event.plain_result("歌曲卡片生成失败，可能歌曲已下架或网络异常。")
             return
 
+        logger.info(f"[floyd] 卡片生成完成：{result['song'].get('name','?')} - {result['song'].get('artists','?')}")
         yield event.image_result(result["path"])
 
         # 卡片成功生成才算打卡。
@@ -179,7 +174,9 @@ class FloydPlugin(Star):
             album=song.get("album", ""),
         )
         if not is_new:
-            logger.debug(f"[floyd] {sender_id} 今日已打卡，重复分享不累计")
+            logger.info(f"[floyd] {sender_id} 今日已打卡，重复分享不累计")
+        else:
+            logger.info(f"[floyd] 打卡成功：{sender_name}({sender_id}) - 《{song.get('name','?')}》")
 
     def _extract_song_id_from_event(self, event: AstrMessageEvent) -> Optional[int]:
         """从消息组件里提取网易云歌曲 id（兼容 Json 卡片与纯文本 URL）。"""
@@ -203,6 +200,7 @@ class FloydPlugin(Star):
     @filter.permission_type(filter.PermissionType.ADMIN)
     async def forcepush(self, event: AstrMessageEvent):
         """手动把当日推歌主题推送到目标群（管理员）。"""
+        logger.info(f"[floyd] /forcepush 由 {event.get_sender_name()}({event.get_sender_id()}) 触发")
         cfg = self._scheduler_cfg()
         today = date.today()
         text: Optional[str]

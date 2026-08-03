@@ -75,21 +75,24 @@ AstrBot Dashboard 里的「Floyd」页面，提供：
 astrbot_plugin_floyd_project/
 ├── main.py                 # 插件入口（Star 类）
 ├── netease.py              # 异步：歌曲 ID 提取 + 网易云接口 + 封面/头像下载
-├── card_renderer.py        # Pillow 卡片渲染
-├── card_service.py         # 卡片生成编排（异步）
+├── card_service.py         # 歌曲卡片生成编排（异步）
 ├── challenge.py            # 文案库管理（CRUD / 导入导出）
 ├── checkin.py              # 打卡记录 / 统计 / 排行（KV）
 ├── ai_generator.py         # AI 文案生成（批量 / 每日）
-├── scheduler.py            # 定时任务 + UMO 跨平台适配
-├── web_api.py              # WebUI 后端路由（Quart）
-├── templates/
-│   └── daily_summary.html  # 每日总结卡片模板（Jinja2 → PNG）
-├── pages/
-│   └── admin/              # WebUI 管理面板（HTML/JS/CSS）
+├── scheduler.py            # 定时任务 + UMO 跨平台适配 + 总结渲染编排
+├── imagecreate/            # PIL 图像渲染（同步，调用方须 asyncio.to_thread）
+│   ├── card_renderer.py        # 歌曲卡片渲染（已定型）
+│   ├── summary_renderer.py     # 每日/每周总结卡片渲染
+│   ├── Harmonyossans.ttf       # 卡片字体（renderer 同目录探测）
+│   └── INTERFACE.md            # 接口契约文档
+├── webui/                  # WebUI 后端 API 归集
+│   └── web_api.py              # Quart 路由（前端 pages/ 受 AstrBot 约束无法迁入，见 webui/README.md）
+├── pages/                  # WebUI 前端（AstrBot 硬编码要求目录名，不可改名）
+│   └── admin/                  # 管理面板（HTML/JS/CSS）
 ├── _conf_schema.json
 ├── metadata.yaml
 ├── requirements.txt
-├── Harmonyossans.ttf       # 卡片字体
+├── CHANGELOG.md            # 更新日志（Dashboard/OpenAPI 读取）
 ├── song_push.txt           # 初始默认文案（首次启动自动导入）
 ├── LICENSE
 └── .gitignore

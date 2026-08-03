@@ -3,3 +3,5 @@ __pycache__/
 main.png
 bao.png
 *.log
+_render_demo.py
+render_demo/

@@ -15,7 +15,6 @@ from typing import Any
 
 from quart import jsonify, request, send_file
 
-import ai_generator
 import challenge as challenge_mod
 import checkin as checkin_mod
 from astrbot.api import logger
@@ -52,13 +51,14 @@ class WebAPI:
         reg(f"{prefix}/challenges", self.challenges_create, ["POST"], "新增推歌文案")
         reg(f"{prefix}/challenges/import", self.challenges_import, ["POST"], "批量导入文案")
         reg(f"{prefix}/challenges/export", self.challenges_export, ["GET"], "导出文案 txt")
-        reg(f"{prefix}/challenges/generate", self.challenges_generate, ["POST"], "AI 生成文案")
         reg(f"{prefix}/checkin/today", self.checkin_today, ["GET"], "今日打卡")
         reg(f"{prefix}/checkin/stats", self.checkin_stats, ["GET"], "打卡统计")
         reg(f"{prefix}/checkin/history", self.checkin_history, ["GET"], "打卡历史(热力图)")
         reg(f"{prefix}/checkin/rank", self.checkin_rank, ["GET"], "打卡排行榜")
         reg(f"{prefix}/checkin/rebuild", self.checkin_rebuild, ["POST"], "重算统计")
         reg(f"{prefix}/state", self.state, ["GET"], "插件状态总览")
+        reg(f"{prefix}/config", self.config_get, ["GET"], "获取插件配置")
+        reg(f"{prefix}/config", self.config_save, ["POST"], "保存插件配置")
 
     # ---------- 挑战文案 ----------
     async def challenges_list(self):
@@ -113,25 +113,6 @@ class WebAPI:
             download_name="challenges.txt",
         )
 
-    async def challenges_generate(self):
-        """AI 批量生成。body: {count?:10, prompt?, provider?}"""
-        body = await request.get_json(silent=True) or {}
-        count = int(body.get("count", 10))
-        custom_prompt = body.get("prompt")
-        gen_provider = body.get("provider") or self.plugin.config.get("gen_provider", "")
-        umo_fb = await self.plugin.get_first_known_umo()
-        try:
-            result = await ai_generator.generate_batch(
-                self.context, self.manager,
-                count=count,
-                custom_prompt=custom_prompt,
-                gen_provider=gen_provider,
-                umo_fallback=umo_fb,
-            )
-        except (ValueError, RuntimeError) as e:
-            return _err(str(e), 500)
-        return _ok(result)
-
     # ---------- 打卡 ----------
     async def checkin_today(self):
         return _ok(await self.store.get_today())
@@ -171,9 +152,39 @@ class WebAPI:
             "challenge_mode": cfg.get("challenge_mode", "sequential"),
             "push_time": cfg.get("push_time", "08:00"),
             "summary_time": cfg.get("summary_time", "22:00"),
+            "weekly_time": cfg.get("weekly_time", "22:30"),
+            "weekly_day": int(cfg.get("weekly_day", 7) or 7),
+            "challenge_start_date": cfg.get("challenge_start_date", ""),
+            "auto_summary_image": bool(cfg.get("auto_summary_image", True)),
             "target_groups": cfg.get("target_groups", []),
             "server_time": datetime.now().isoformat(timespec="seconds"),
         })
+
+    # ---------- 配置 ----------
+    async def config_get(self):
+        """返回 schema + 当前值，前端据此渲染配置表单。"""
+        cfg = self.plugin.config
+        schema = getattr(cfg, "schema", None) or {}
+        # 过滤掉 AstrBotConfig 内部字段，只返回业务键。
+        values = {k: cfg.get(k) for k in (schema or {}) if not k.startswith("_")}
+        return _ok({"schema": schema, "values": values})
+
+    async def config_save(self):
+        """部分更新配置。save 后不自动 reload，前端提示用户手动重载。"""
+        body = await request.get_json(silent=True) or {}
+        cfg = self.plugin.config
+        # 只允许更新 schema 里声明的键，防越权写。
+        schema = getattr(cfg, "schema", None) or {}
+        allowed = {k: v for k, v in body.items() if k in schema and not k.startswith("_")}
+        if not allowed:
+            return _err("没有可更新的配置项")
+        try:
+            await cfg.save_config_async(allowed)
+        except Exception as e:  # noqa: BLE001
+            logger.info(f"[web_api] 配置保存失败: {e}")
+            return _err(f"保存失败: {e}", 500)
+        logger.info(f"[web_api] 配置已保存：{list(allowed.keys())}（需重载插件生效定时任务变更）")
+        return _ok({"saved": list(allowed.keys()), "hint": "配置已写入，需在 Dashboard 重载插件后生效定时任务变更"})
 
 
 def register_delete_route(plugin: Any) -> None:

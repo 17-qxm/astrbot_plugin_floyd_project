@@ -1,161 +1,417 @@
-/* Floyd 管理面板样式 — 纯 vanilla，无外部依赖。
-   深色科技风，与每日总结卡片呼应。 */
+/* Floyd 管理面板 — Linear/GitHub 风，纯深色。
+   作用域隔离在 #floyd-app 下，避免与 AstrBot Dashboard 冲突。 */
 
-* { box-sizing: border-box; margin: 0; padding: 0; }
+/* ---------- 设计 tokens ---------- */
+#floyd-app {
+  --bg: #0d1117;
+  --surface: #161b22;
+  --surface-2: #21262d;
+  --surface-hover: #30363d;
+  --border: #30363d;
+  --border-soft: #21262d;
 
-:root {
-  --bg: #0f1226;
-  --panel: #1a1f3d;
-  --panel-2: #161a33;
-  --border: #2a3158;
-  --border-soft: #232a4d;
-  --text: #e7e9f3;
-  --text-dim: #9aa0c0;
-  --text-faint: #6b7196;
-  --accent: #7c9cff;
-  --accent-2: #5b6fd6;
-  --danger: #ff6b6b;
-  --ok: #4ade80;
-  --radius: 12px;
-  --shadow: 0 2px 8px rgba(0, 0, 0, 0.25);
-}
+  --text: #e6edf3;
+  --text-dim: #8b949e;
+  --text-faint: #6e7681;
 
-body {
-  font-family: 'PingFang SC', 'Microsoft YaHei', 'HarmonyOS Sans SC', system-ui, sans-serif;
+  --accent: #8b5cf6;
+  --accent-hover: #7c3aed;
+  --accent-soft: rgba(139, 92, 246, 0.15);
+  --success: #3fb950;
+  --success-soft: rgba(63, 185, 80, 0.15);
+  --danger: #f85149;
+  --danger-soft: rgba(248, 81, 73, 0.15);
+  --warning: #d29922;
+  --warning-soft: rgba(210, 153, 34, 0.15);
+
+  --radius: 6px;
+  --radius-sm: 4px;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 8px 24px rgba(0, 0, 0, 0.4);
+  --font: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', 'HarmonyOS Sans SC', sans-serif;
+  --font-mono: 'SF Mono', 'Cascadia Code', Consolas, 'Liberation Mono', monospace;
+
+  font-family: var(--font);
   background: var(--bg);
   color: var(--text);
   min-height: 100vh;
   -webkit-font-smoothing: antialiased;
+  font-size: 14px;
+  line-height: 1.5;
+}
+#floyd-app * { box-sizing: border-box; }
+#floyd-app a { color: var(--accent); text-decoration: none; }
+#floyd-app a:hover { text-decoration: underline; }
+
+/* ---------- 布局 ---------- */
+#floyd-app .app { max-width: 1120px; margin: 0 auto; padding: 24px 24px 80px; }
+
+/* 顶栏 */
+#floyd-app .topbar {
+  display: flex; align-items: center; gap: 14px; margin-bottom: 24px;
+}
+#floyd-app .topbar .brand {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 16px; font-weight: 600;
+}
+#floyd-app .topbar .brand .logo { font-size: 20px; }
+#floyd-app .topbar .state-bar {
+  display: flex; gap: 0; margin-left: auto;
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); overflow: hidden; font-size: 12px;
+}
+#floyd-app .topbar .state-bar .seg {
+  padding: 6px 12px; color: var(--text-dim);
+  border-right: 1px solid var(--border); display: flex; align-items: center; gap: 4px;
+}
+#floyd-app .topbar .state-bar .seg:last-child { border-right: none; }
+#floyd-app .topbar .state-bar .seg b { color: var(--text); font-weight: 600; }
+#floyd-app .topbar .state-bar .seg .dot {
+  width: 6px; height: 6px; border-radius: 50%; background: var(--success);
+}
+#floyd-app .icon-btn {
+  width: 32px; height: 32px; display: flex; align-items: center; justify-content: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--radius);
+  color: var(--text-dim); cursor: pointer; transition: all .15s; font-size: 15px;
+}
+#floyd-app .icon-btn:hover { background: var(--surface-hover); color: var(--text); }
+
+/* Tabs */
+#floyd-app .tabs {
+  display: flex; gap: 2px; margin-bottom: 20px;
+  border-bottom: 1px solid var(--border);
+}
+#floyd-app .tab {
+  padding: 8px 14px; cursor: pointer; color: var(--text-dim); font-size: 14px;
+  border: none; border-bottom: 2px solid transparent; background: none;
+  font-family: inherit; transition: color .15s, border-color .15s; margin-bottom: -1px;
+}
+#floyd-app .tab:hover { color: var(--text); }
+#floyd-app .tab.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 500; }
+
+/* ---------- 通用卡片 ---------- */
+#floyd-app .card {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 16px;
+}
+#floyd-app .card + .card { margin-top: 16px; }
+#floyd-app .card-title {
+  font-size: 13px; font-weight: 600; color: var(--text); margin-bottom: 12px;
+  display: flex; align-items: center; justify-content: space-between;
+}
+#floyd-app .card-desc { color: var(--text-dim); font-size: 12px; margin-bottom: 12px; line-height: 1.6; }
+
+/* ---------- 表单元素 ---------- */
+#floyd-app input[type="text"], #floyd-app input[type="number"],
+#floyd-app textarea, #floyd-app select {
+  width: 100%; background: var(--surface-2); border: 1px solid var(--border);
+  color: var(--text); border-radius: var(--radius-sm); padding: 6px 10px;
+  font-size: 13px; font-family: inherit; outline: none; transition: border-color .15s;
+}
+#floyd-app input:focus, #floyd-app textarea:focus, #floyd-app select:focus {
+  border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft);
+}
+#floyd-app textarea { resize: vertical; min-height: 72px; line-height: 1.5; }
+#floyd-app input[type="checkbox"], #floyd-app input[type="radio"] { accent-color: var(--accent); }
+#floyd-app .row { display: flex; gap: 8px; align-items: center; }
+#floyd-app .row > * { flex: 1; }
+#floyd-app .row .narrow { flex: 0 0 auto; }
+
+/* 按钮 */
+#floyd-app button {
+  cursor: pointer; border: 1px solid var(--border); background: var(--surface-2);
+  color: var(--text); border-radius: var(--radius-sm); padding: 6px 12px;
+  font-size: 13px; font-family: inherit; transition: all .15s;
+  display: inline-flex; align-items: center; gap: 4px; white-space: nowrap;
+}
+#floyd-app button:hover { background: var(--surface-hover); border-color: var(--text-faint); }
+#floyd-app button:disabled { opacity: .5; cursor: not-allowed; }
+#floyd-app button.primary {
+  background: var(--accent); border-color: var(--accent); color: #fff; font-weight: 500;
+}
+#floyd-app button.primary:hover { background: var(--accent-hover); border-color: var(--accent-hover); }
+#floyd-app button.danger { color: var(--danger); border-color: rgba(248, 81, 73, 0.4); }
+#floyd-app button.danger:hover { background: var(--danger-soft); }
+#floyd-app button.ghost { background: transparent; border-color: transparent; color: var(--text-dim); }
+#floyd-app button.ghost:hover { background: var(--surface-hover); color: var(--text); }
+#floyd-app button.sm { padding: 3px 8px; font-size: 12px; }
+#floyd-app .btn-group { display: flex; gap: 8px; flex-wrap: wrap; }
+
+/* 标签 */
+#floyd-app .tag {
+  display: inline-flex; align-items: center; padding: 1px 8px;
+  font-size: 11px; border-radius: 20px; font-weight: 500;
+  border: 1px solid transparent; text-transform: uppercase; letter-spacing: .3px;
+}
+#floyd-app .tag.manual { color: var(--text-dim); background: var(--surface-2); border-color: var(--border); }
+#floyd-app .tag.import { color: #58a6ff; background: rgba(88, 166, 255, 0.12); border-color: rgba(88, 166, 255, 0.3); }
+#floyd-app .tag.ai { color: var(--accent); background: var(--accent-soft); border-color: rgba(139, 92, 246, 0.3); }
+
+/* ---------- 工具栏（文案库顶部） ---------- */
+#floyd-app .toolbar {
+  display: flex; align-items: center; gap: 8px; flex-wrap: wrap;
+  margin-bottom: 16px;
+}
+#floyd-app .toolbar .spacer { flex: 1; }
+#floyd-app .toolbar .search {
+  position: relative; flex: 0 0 220px;
+}
+#floyd-app .toolbar .search input { padding-left: 30px; }
+#floyd-app .toolbar .search .ico {
+  position: absolute; left: 9px; top: 50%; transform: translateY(-50%);
+  color: var(--text-faint); font-size: 13px; pointer-events: none;
 }
 
-.app { max-width: 1100px; margin: 0 auto; padding: 28px 24px 64px; }
-
-/* ---- 顶栏 ---- */
-.topbar { display: flex; align-items: center; gap: 16px; margin-bottom: 28px; }
-.topbar h1 { font-size: 22px; font-weight: 700; }
-.topbar .sub { color: var(--text-dim); font-size: 14px; }
-.state-pill {
-  margin-left: auto; background: var(--panel); border: 1px solid var(--border);
-  border-radius: 999px; padding: 6px 14px; font-size: 13px; color: var(--text-dim);
+/* ---------- 文案列表（紧凑表格行） ---------- */
+#floyd-app .ch-list { list-style: none; }
+#floyd-app .ch-row {
+  display: flex; align-items: center; gap: 10px; padding: 8px 12px;
+  border-bottom: 1px solid var(--border-soft); transition: background .12s;
 }
-.state-pill b { color: var(--accent); }
+#floyd-app .ch-row:hover { background: var(--surface-2); }
+#floyd-app .ch-row:last-child { border-bottom: none; }
+#floyd-app .ch-row .idx { color: var(--text-faint); font-size: 12px; width: 36px; flex-shrink: 0; font-variant-numeric: tabular-nums; }
+#floyd-app .ch-row .text { flex: 1; font-size: 13px; line-height: 1.5; word-break: break-word; }
+#floyd-app .ch-row .acts { display: flex; gap: 2px; flex-shrink: 0; opacity: 0; transition: opacity .12s; }
+#floyd-app .ch-row:hover .acts { opacity: 1; }
+#floyd-app .ch-row.editing .acts { opacity: 1; }
+#floyd-app .ch-row.editing .text-input { flex: 1; }
+#floyd-app .ch-row .src { flex-shrink: 0; }
+#floyd-app .ch-empty { text-align: center; color: var(--text-faint); padding: 40px 16px; font-size: 13px; }
 
-/* ---- Tabs ---- */
-.tabs { display: flex; gap: 4px; margin-bottom: 24px; border-bottom: 1px solid var(--border-soft); }
-.tab {
-  padding: 12px 20px; cursor: pointer; color: var(--text-dim); font-size: 15px;
-  border-bottom: 2px solid transparent; transition: color .15s, border-color .15s;
-  background: none; border-top: none; border-left: none; border-right: none;
-  font-family: inherit;
+/* 分页 */
+#floyd-app .pager {
+  display: flex; align-items: center; justify-content: center; gap: 6px;
+  padding: 12px 0 0; font-size: 12px; color: var(--text-dim);
 }
-.tab:hover { color: var(--text); }
-.tab.active { color: var(--accent); border-bottom-color: var(--accent); }
+#floyd-app .pager .info { margin: 0 8px; }
 
-/* ---- 通用卡片 ---- */
-.card {
-  background: var(--panel); border: 1px solid var(--border);
-  border-radius: var(--radius); padding: 20px 22px; box-shadow: var(--shadow);
+/* ---------- 配置表单 ---------- */
+#floyd-app .config-form { display: flex; flex-direction: column; gap: 14px; }
+#floyd-app .cfg-field { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+#floyd-app .cfg-field > label {
+  flex: 0 0 160px; font-size: 13px; color: var(--text); font-weight: 500;
 }
-.card + .card { margin-top: 16px; }
-.card-title { font-size: 16px; font-weight: 600; margin-bottom: 14px; }
-.card-desc { color: var(--text-dim); font-size: 13px; margin-bottom: 14px; line-height: 1.5; }
-
-/* ---- 表单元素 ---- */
-input[type="text"], input[type="number"], textarea, select {
-  width: 100%; background: var(--panel-2); border: 1px solid var(--border-soft);
-  color: var(--text); border-radius: 8px; padding: 10px 12px; font-size: 14px;
-  font-family: inherit; outline: none; transition: border-color .15s;
+#floyd-app .cfg-hint { font-size: 11px; color: var(--text-faint); width: 100%; padding-left: 172px; }
+#floyd-app .cfg-tags {
+  display: flex; align-items: center; gap: 6px; flex-wrap: wrap;
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm); padding: 6px 8px; flex: 1;
 }
-input:focus, textarea:focus, select:focus { border-color: var(--accent); }
-textarea { resize: vertical; min-height: 80px; line-height: 1.5; }
-.row { display: flex; gap: 10px; align-items: center; }
-.row > * { flex: 1; }
-.row .narrow { flex: 0 0 110px; }
-
-button {
-  cursor: pointer; border: 1px solid var(--border); background: var(--panel-2);
-  color: var(--text); border-radius: 8px; padding: 10px 16px; font-size: 14px;
-  font-family: inherit; transition: background .15s, border-color .15s, opacity .15s;
+#floyd-app .cfg-tag {
+  display: inline-flex; align-items: center; gap: 4px;
+  background: var(--surface-hover); border: 1px solid var(--border);
+  border-radius: var(--radius-sm); padding: 3px 8px; font-size: 12px; color: var(--text);
 }
-button:hover { background: var(--border-soft); }
-button.primary { background: var(--accent); border-color: var(--accent); color: #0f1226; font-weight: 600; }
-button.primary:hover { background: var(--accent-2); }
-button.danger { color: var(--danger); border-color: #4a2b34; }
-button.danger:hover { background: #2a1820; }
-button:disabled { opacity: .5; cursor: not-allowed; }
-.btn-row { display: flex; gap: 10px; flex-wrap: wrap; margin-top: 14px; }
+#floyd-app .cfg-tag button { padding: 0 4px; font-size: 11px; }
+#floyd-app .switch { display: inline-flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; }
+#floyd-app .switch input { width: auto; }
 
-/* ---- 文案列表 ---- */
-.list-head {
+/* ---------- 今日预览 ---------- */
+#floyd-app .today-preview {
+  display: flex; align-items: center; gap: 12px; padding: 10px 14px;
+  background: var(--accent-soft); border: 1px solid rgba(139, 92, 246, 0.25);
+  border-radius: var(--radius);
+}
+#floyd-app .today-preview .day-num {
+  flex-shrink: 0; font-size: 12px; font-weight: 700; color: var(--accent);
+  background: rgba(139, 92, 246, 0.2); padding: 3px 10px; border-radius: 20px;
+}
+#floyd-app .today-preview .preview-text { font-size: 15px; font-weight: 500; }
+#floyd-app .list-head {
   display: flex; justify-content: space-between; align-items: center;
-  margin-bottom: 12px; color: var(--text-dim); font-size: 13px;
+  color: var(--text-dim); font-size: 12px;
 }
-.ch-list { list-style: none; display: flex; flex-direction: column; gap: 8px; }
-.ch-item {
-  display: flex; align-items: center; gap: 12px; background: var(--panel-2);
-  border: 1px solid var(--border-soft); border-radius: 8px; padding: 10px 14px;
-}
-.ch-item .num { color: var(--text-faint); font-size: 13px; width: 32px; flex-shrink: 0; }
-.ch-item .text { flex: 1; font-size: 14px; line-height: 1.4; }
-.ch-item .src {
-  font-size: 11px; color: var(--text-faint); background: var(--bg);
-  border-radius: 4px; padding: 2px 8px; flex-shrink: 0; text-transform: uppercase;
-}
-.ch-item .actions { display: flex; gap: 6px; flex-shrink: 0; }
-.ch-item .actions button { padding: 5px 10px; font-size: 12px; }
-.ch-edit { flex: 1; }
 
-.empty-state { text-align: center; color: var(--text-faint); padding: 32px; font-size: 14px; }
-
-/* ---- 统计卡片 ---- */
-.stats-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 14px; }
-.stat {
-  background: var(--panel-2); border: 1px solid var(--border-soft);
-  border-radius: var(--radius); padding: 18px;
+/* ---------- 统计卡片 ---------- */
+#floyd-app .stat-grid {
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
 }
-.stat .big { font-size: 32px; font-weight: 800; color: var(--accent); }
-.stat .lbl { color: var(--text-dim); font-size: 13px; margin-top: 4px; }
-
-/* ---- 热力图 ---- */
-.heatmap {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(14px, 1fr));
-  gap: 4px; margin-top: 8px;
+#floyd-app .stat {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px;
 }
-.heat-cell {
-  aspect-ratio: 1; border-radius: 3px; background: var(--panel-2);
-  border: 1px solid var(--border-soft);
+#floyd-app .stat .val { font-size: 26px; font-weight: 700; color: var(--text); font-variant-numeric: tabular-nums; }
+#floyd-app .stat .val.accent { color: var(--accent); }
+#floyd-app .stat .lbl { color: var(--text-dim); font-size: 12px; margin-top: 2px; }
+@media (max-width: 640px) {
+  #floyd-app .stat-grid { grid-template-columns: repeat(2, 1fr); }
 }
-.heat-cell.l1 { background: #2a3a6b; }
-.heat-cell.l2 { background: #3d5bb0; }
-.heat-cell.l3 { background: #5b7fd6; }
-.heat-cell.l4 { background: var(--accent); }
-.heat-legend { display: flex; align-items: center; gap: 6px; margin-top: 10px; font-size: 12px; color: var(--text-faint); }
-.heat-legend .swatches { display: flex; gap: 3px; }
-.heat-legend .swatches span { width: 12px; height: 12px; border-radius: 3px; }
 
-/* ---- 排行榜 ---- */
-.rank-table { width: 100%; border-collapse: collapse; font-size: 14px; }
-.rank-table th, .rank-table td { padding: 10px 12px; text-align: left; }
-.rank-table th { color: var(--text-dim); font-weight: 500; font-size: 12px; text-transform: uppercase; letter-spacing: .5px; }
-.rank-table tr { border-bottom: 1px solid var(--border-soft); }
-.rank-table tr:last-child { border-bottom: none; }
-.rank-table .pos { width: 40px; color: var(--text-faint); }
-.rank-table .pos.top { color: var(--accent); font-weight: 700; }
-.rank-table td.num { color: var(--accent); font-weight: 600; }
+/* ---------- 热力图（GitHub 式矩阵） ---------- */
+#floyd-app .heatmap-wrap { overflow-x: auto; padding-bottom: 4px; }
+#floyd-app .heatmap {
+  display: grid; grid-auto-flow: column; grid-template-rows: repeat(7, 12px);
+  gap: 3px; min-width: max-content;
+}
+#floyd-app .heat-cell {
+  width: 12px; height: 12px; border-radius: 2px; background: var(--surface-2);
+  border: 1px solid rgba(255,255,255,0.03); cursor: pointer; position: relative;
+}
+#floyd-app .heat-cell.l1 { background: #1e2331; }
+#floyd-app .heat-cell.l2 { background: #44376b; }
+#floyd-app .heat-cell.l3 { background: #7c3aed; }
+#floyd-app .heat-cell.l4 { background: #a78bfa; }
+#floyd-app .heat-months {
+  display: grid; grid-auto-flow: column; gap: 3px; font-size: 10px;
+  color: var(--text-faint); margin-bottom: 4px; min-width: max-content;
+}
+#floyd-app .heat-legend {
+  display: flex; align-items: center; gap: 4px; margin-top: 8px; font-size: 11px; color: var(--text-faint);
+}
+#floyd-app .heat-legend .swatches { display: flex; gap: 3px; }
+#floyd-app .heat-legend .swatches span { width: 11px; height: 11px; border-radius: 2px; }
 
-/* ---- toast ---- */
-.toast {
+/* ---------- 排行榜 ---------- */
+#floyd-app .rank-table { width: 100%; border-collapse: collapse; font-size: 13px; }
+#floyd-app .rank-table th, #floyd-app .rank-table td { padding: 8px 10px; text-align: left; }
+#floyd-app .rank-table th {
+  color: var(--text-faint); font-weight: 500; font-size: 11px;
+  text-transform: uppercase; letter-spacing: .5px; border-bottom: 1px solid var(--border);
+}
+#floyd-app .rank-table tr td { border-bottom: 1px solid var(--border-soft); }
+#floyd-app .rank-table tr:last-child td { border-bottom: none; }
+#floyd-app .rank-table tr:hover td { background: var(--surface-2); }
+#floyd-app .rank-table .pos { width: 40px; color: var(--text-faint); }
+#floyd-app .rank-table .pos.medal { font-size: 16px; }
+#floyd-app .rank-table .user { display: flex; align-items: center; gap: 8px; }
+#floyd-app .rank-table .user img {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--surface-2);
+}
+#floyd-app .rank-table .user .ava-fallback {
+  width: 22px; height: 22px; border-radius: 50%; background: var(--accent-soft);
+  color: var(--accent); display: flex; align-items: center; justify-content: center;
+  font-size: 11px; font-weight: 600;
+}
+#floyd-app .rank-table .num { color: var(--accent); font-weight: 600; font-variant-numeric: tabular-nums; }
+
+/* ---------- 今日歌单（带封面） ---------- */
+#floyd-app .today-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 10px;
+}
+#floyd-app .today-card {
+  display: flex; align-items: center; gap: 10px; padding: 10px;
+  background: var(--surface-2); border: 1px solid var(--border-soft);
+  border-radius: var(--radius); transition: border-color .12s;
+}
+#floyd-app .today-card:hover { border-color: var(--border); }
+#floyd-app .today-card .cover {
+  width: 44px; height: 44px; border-radius: var(--radius-sm); object-fit: cover;
+  background: var(--surface-hover); flex-shrink: 0;
+}
+#floyd-app .today-card .cover-fallback {
+  width: 44px; height: 44px; border-radius: var(--radius-sm); flex-shrink: 0;
+  display: flex; align-items: center; justify-content: center; font-size: 18px;
+}
+#floyd-app .today-card .info { flex: 1; min-width: 0; }
+#floyd-app .today-card .song {
+  font-size: 13px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#floyd-app .today-card .artist {
+  font-size: 12px; color: var(--text-dim); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+#floyd-app .today-card .meta {
+  font-size: 11px; color: var(--text-faint); margin-top: 2px;
+}
+
+/* ---------- 骨架屏 ---------- */
+#floyd-app .skeleton {
+  background: linear-gradient(90deg, var(--surface-2) 25%, var(--surface-hover) 50%, var(--surface-2) 75%);
+  background-size: 200% 100%; animation: floyd-shimmer 1.5s infinite;
+  border-radius: var(--radius-sm);
+}
+@keyframes floyd-shimmer {
+  0% { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+#floyd-app .skel-line { height: 14px; margin-bottom: 8px; }
+#floyd-app .skel-line:last-child { margin-bottom: 0; width: 60%; }
+
+/* ---------- Toast 队列 ---------- */
+#floyd-app .toast-stack {
   position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
-  background: var(--panel); border: 1px solid var(--border); color: var(--text);
-  padding: 12px 20px; border-radius: 8px; box-shadow: var(--shadow);
-  font-size: 14px; z-index: 100; opacity: 0; transition: opacity .2s, transform .2s;
+  display: flex; flex-direction: column-reverse; gap: 8px; z-index: 200;
+  pointer-events: none;
 }
-.toast.show { opacity: 1; transform: translateX(-50%) translateY(-4px); }
-.toast.err { border-color: var(--danger); color: var(--danger); }
+#floyd-app .toast {
+  background: var(--surface); border: 1px solid var(--border); color: var(--text);
+  padding: 10px 16px; border-radius: var(--radius); box-shadow: var(--shadow-md);
+  font-size: 13px; display: flex; align-items: center; gap: 8px;
+  animation: floyd-toast-in .2s ease; pointer-events: auto; max-width: 420px;
+}
+#floyd-app .toast.success { border-left: 3px solid var(--success); }
+#floyd-app .toast.error { border-left: 3px solid var(--danger); }
+#floyd-app .toast.info { border-left: 3px solid var(--accent); }
+@keyframes floyd-toast-in {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
 
-.loading { color: var(--text-faint); font-size: 14px; padding: 20px 0; }
+/* ---------- Modal ---------- */
+#floyd-app .modal-mask {
+  position: fixed; inset: 0; background: rgba(1, 4, 9, 0.7);
+  display: flex; align-items: center; justify-content: center; z-index: 300;
+  animation: floyd-fade .15s ease;
+}
+#floyd-app .modal {
+  background: var(--surface); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 20px; width: 100%; max-width: 420px;
+  box-shadow: var(--shadow-md); animation: floyd-modal-in .15s ease;
+}
+#floyd-app .modal h3 { font-size: 15px; margin-bottom: 8px; }
+#floyd-app .modal p { color: var(--text-dim); font-size: 13px; margin-bottom: 16px; line-height: 1.6; }
+#floyd-app .modal .modal-acts { display: flex; justify-content: flex-end; gap: 8px; }
+@keyframes floyd-fade { from { opacity: 0; } to { opacity: 1; } }
+@keyframes floyd-modal-in { from { opacity: 0; transform: scale(.96); } to { opacity: 1; transform: scale(1); } }
 
-/* ---- 工具 ---- */
-.hidden { display: none !important; }
-.muted { color: var(--text-dim); }
-.right { text-align: right; }
+/* ---------- 设置抽屉 ---------- */
+#floyd-app .drawer-mask {
+  position: fixed; inset: 0; background: rgba(1, 4, 9, 0.6);
+  z-index: 250; animation: floyd-fade .15s ease;
+}
+#floyd-app .drawer {
+  position: fixed; top: 0; right: 0; bottom: 0; width: 100%; max-width: 400px;
+  background: var(--surface); border-left: 1px solid var(--border);
+  box-shadow: var(--shadow-md); z-index: 260; overflow-y: auto;
+  animation: floyd-drawer-in .2s ease;
+}
+#floyd-app .drawer .drawer-head {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 16px; border-bottom: 1px solid var(--border);
+}
+#floyd-app .drawer .drawer-head h3 { font-size: 15px; font-weight: 600; }
+#floyd-app .drawer .drawer-body { padding: 16px; }
+#floyd-app .drawer .section { margin-bottom: 20px; }
+#floyd-app .drawer .section-title {
+  font-size: 11px; font-weight: 600; color: var(--text-faint);
+  text-transform: uppercase; letter-spacing: .5px; margin-bottom: 8px;
+}
+#floyd-app .drawer pre {
+  background: var(--bg); border: 1px solid var(--border-soft);
+  border-radius: var(--radius-sm); padding: 10px; font-size: 12px;
+  font-family: var(--font-mono); overflow-x: auto; color: var(--text-dim);
+}
+@keyframes floyd-drawer-in { from { transform: translateX(100%); } to { transform: translateX(0); } }
+
+/* ---------- 杂项 ---------- */
+#floyd-app .empty-state {
+  text-align: center; color: var(--text-faint); padding: 40px 16px; font-size: 13px;
+}
+#floyd-app .muted { color: var(--text-dim); }
+#floyd-app .faint { color: var(--text-faint); }
+#floyd-app .err-block {
+  text-align: center; padding: 24px; color: var(--danger); font-size: 13px;
+}
+#floyd-app .err-block button { margin-top: 8px; }
+#floyd-app .hint-banner {
+  background: var(--accent-soft); border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: var(--radius); padding: 10px 14px; font-size: 12px; color: var(--text-dim);
+  margin-bottom: 16px; line-height: 1.6;
+}
+#floyd-app .spinner {
+  display: inline-block; width: 12px; height: 12px;
+  border: 1.5px solid var(--border); border-top-color: var(--accent);
+  border-radius: 50%; animation: floyd-spin .6s linear infinite;
+}
+@keyframes floyd-spin { to { transform: rotate(360deg); } }

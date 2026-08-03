@@ -14,10 +14,9 @@ from typing import Optional
 from astrbot.api import logger
 
 import netease
-from card_renderer import render_card
+from imagecreate.card_renderer import render_card
 
 PLUGIN_DIR = Path(__file__).resolve().parent
-FONT_PATH = PLUGIN_DIR / "Harmonyossans.ttf"
 
 
 async def generate_song_card(
@@ -43,15 +42,16 @@ async def generate_song_card(
         song = await netease.fetch_song_detail(song_id)
         cover = await netease.download_cover(song["cover_url"])
     except Exception as e:  # noqa: BLE001 - 网络层有任意异常形态，统一降级
-        logger.error(f"[musiccard] 获取歌曲信息失败 (id={song_id}): {e}")
+        logger.info(f"[musiccard] 获取歌曲信息失败 (id={song_id}): {e}")
         return None
 
     avatar = await netease.download_qq_avatar(recommender_qq) if recommender_qq else None
 
     output_path = output_dir / f"song_{song_id}_{uuid.uuid4().hex[:8]}.png"
-    font = str(FONT_PATH) if FONT_PATH.is_file() else None
+    font = None  # 让 card_renderer._find_font 自行探测同目录字体
 
     # PIL 是 CPU 密集的同步库，丢到线程池避免阻塞事件循环。
+    logger.info(f"[musiccard] 开始渲染卡片：{song.get('name','?')} (id={song_id})")
     await asyncio.to_thread(
         render_card,
         song,
@@ -61,4 +61,5 @@ async def generate_song_card(
         recommender,
         avatar,
     )
+    logger.info(f"[musiccard] 卡片已写入：{output_path.name}")
     return {"path": str(output_path), "song": song}
