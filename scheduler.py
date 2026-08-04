@@ -134,7 +134,6 @@ async def build_push_text(
 
 async def run_push_task(plugin: Any, context: Any, cfg: dict, manager: challenge_mod.ChallengeManager) -> None:
     """每日推歌定时循环。"""
-    print(f"[scheduler] >>> 推歌任务协程已进入", flush=True)
     while True:
         try:
             secs = seconds_until(cfg["push_time"])
@@ -201,7 +200,6 @@ async def run_summary_task(
     plugin: Any, context: Any, cfg: dict, store: checkin_mod.CheckinStore
 ) -> None:
     """每日总结定时循环。"""
-    print(f"[scheduler] >>> 每日总结任务协程已进入", flush=True)
     while True:
         try:
             secs = seconds_until(cfg["summary_time"])

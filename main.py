@@ -61,26 +61,8 @@ class FloydPlugin(Star):
         # WebAPI（在 initialize 注册，确保 context 就绪；这里先持有实例）。
         self._web_api = web_api.WebAPI(self)
 
-        # 定时任务在 __init__ 创建（与 old 版本一致，避免 initialize 时机问题）。
+        # 定时任务在 initialize 里创建（async 上下文，事件循环确定运行）。
         self._tasks: list[asyncio.Task] = []
-        cfg = self._scheduler_cfg()
-        for name, coro in [
-            ("推歌", scheduler_mod.run_push_task(self, self.context, cfg, self.challenge_mgr)),
-            ("每日总结", scheduler_mod.run_summary_task(self, self.context, cfg, self.checkin_store)),
-            ("每周总结", scheduler_mod.run_weekly_task(self, self.context, cfg)),
-        ]:
-            t = asyncio.create_task(coro, name=name)
-
-            def _on_done(task, _name=name):
-                if task.cancelled():
-                    logger.info(f"[floyd] 定时任务「{_name}」已取消")
-                elif task.exception():
-                    logger.info(f"[floyd] 定时任务「{_name}」异常退出: {task.exception()}")
-                else:
-                    logger.info(f"[floyd] 定时任务「{_name}」正常结束")
-            t.add_done_callback(_on_done)
-            self._tasks.append(t)
-        logger.info(f"[floyd] 定时任务已启动（推歌 / 每日总结 / 每周总结），cfg={cfg}")
 
     def _resolve_data_dir(self) -> Path:
         """优先用 AstrBot 的插件数据目录；取不到则回落到插件目录下的 data/。"""
@@ -115,6 +97,26 @@ class FloydPlugin(Star):
             logger.info("[floyd] WebUI 路由已注册")
         except Exception as e:  # noqa: BLE001 — register_web_api 在低版本可能不存在
             logger.info(f"[floyd] WebUI 路由注册失败（可能 AstrBot 版本不支持）: {e}")
+
+        # 启动定时任务（在 initialize 的 async 上下文里创建，事件循环确定运行）。
+        cfg = self._scheduler_cfg()
+        for name, coro in [
+            ("推歌", scheduler_mod.run_push_task(self, self.context, cfg, self.challenge_mgr)),
+            ("每日总结", scheduler_mod.run_summary_task(self, self.context, cfg, self.checkin_store)),
+            ("每周总结", scheduler_mod.run_weekly_task(self, self.context, cfg)),
+        ]:
+            t = asyncio.create_task(coro, name=name)
+
+            def _on_done(task, _name=name):
+                if task.cancelled():
+                    logger.info(f"[floyd] 定时任务「{_name}」已取消")
+                elif task.exception():
+                    logger.info(f"[floyd] 定时任务「{_name}」异常退出: {task.exception()}")
+                else:
+                    logger.info(f"[floyd] 定时任务「{_name}」正常结束")
+            t.add_done_callback(_on_done)
+            self._tasks.append(t)
+        logger.info(f"[floyd] 定时任务已启动（推歌 / 每日总结 / 每周总结）")
 
     def _scheduler_cfg(self) -> dict:
         start_date = challenge_mod.parse_start_date(self.config.get("challenge_start_date", ""))
