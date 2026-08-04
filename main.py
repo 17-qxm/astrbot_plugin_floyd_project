@@ -64,10 +64,23 @@ class FloydPlugin(Star):
         # 定时任务在 __init__ 创建（与 old 版本一致，避免 initialize 时机问题）。
         self._tasks: list[asyncio.Task] = []
         cfg = self._scheduler_cfg()
-        self._tasks.append(asyncio.create_task(scheduler_mod.run_push_task(self, self.context, cfg, self.challenge_mgr)))
-        self._tasks.append(asyncio.create_task(scheduler_mod.run_summary_task(self, self.context, cfg, self.checkin_store)))
-        self._tasks.append(asyncio.create_task(scheduler_mod.run_weekly_task(self, self.context, cfg)))
-        logger.info("[floyd] 定时任务已启动（推歌 / 每日总结 / 每周总结）")
+        for name, coro in [
+            ("推歌", scheduler_mod.run_push_task(self, self.context, cfg, self.challenge_mgr)),
+            ("每日总结", scheduler_mod.run_summary_task(self, self.context, cfg, self.checkin_store)),
+            ("每周总结", scheduler_mod.run_weekly_task(self, self.context, cfg)),
+        ]:
+            t = asyncio.create_task(coro, name=name)
+
+            def _on_done(task, _name=name):
+                if task.cancelled():
+                    logger.info(f"[floyd] 定时任务「{_name}」已取消")
+                elif task.exception():
+                    logger.info(f"[floyd] 定时任务「{_name}」异常退出: {task.exception()}")
+                else:
+                    logger.info(f"[floyd] 定时任务「{_name}」正常结束")
+            t.add_done_callback(_on_done)
+            self._tasks.append(t)
+        logger.info(f"[floyd] 定时任务已启动（推歌 / 每日总结 / 每周总结），cfg={cfg}")
 
     def _resolve_data_dir(self) -> Path:
         """优先用 AstrBot 的插件数据目录；取不到则回落到插件目录下的 data/。"""
