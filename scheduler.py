@@ -136,7 +136,9 @@ async def run_push_task(plugin: Any, context: Any, cfg: dict, manager: challenge
     """每日推歌定时循环。"""
     while True:
         try:
-            await asyncio.sleep(seconds_until(cfg["push_time"]))
+            secs = seconds_until(cfg["push_time"])
+            logger.info(f"[scheduler] 下次推歌将在 {int(secs)} 秒后（{cfg['push_time']}）")
+            await asyncio.sleep(secs)
             today = date.today()
             if await _is_done(plugin, "push", today):
                 continue
@@ -200,7 +202,9 @@ async def run_summary_task(
     """每日总结定时循环。"""
     while True:
         try:
-            await asyncio.sleep(seconds_until(cfg["summary_time"]))
+            secs = seconds_until(cfg["summary_time"])
+            logger.info(f"[scheduler] 下次每日总结将在 {int(secs)} 秒后（{cfg['summary_time']}）")
+            await asyncio.sleep(secs)
             today = date.today()
             if await _is_done(plugin, "summary", today):
                 continue
@@ -291,7 +295,9 @@ async def _render_summary_card(
     """
     from imagecreate import summary_renderer as sr
     try:
+        logger.info(f"[scheduler] 开始渲染每日总结：{len(checkins)} 首歌")
         assets = await _download_assets(checkins)
+        logger.info(f"[scheduler] 资源下载完成：{len(assets)} 项")
         out = CARD_CACHE_DIR / f"summary_{today.isoformat()}_{uuid.uuid4().hex[:8]}.png"
         out.parent.mkdir(parents=True, exist_ok=True)
         await asyncio.to_thread(
@@ -302,6 +308,7 @@ async def _render_summary_card(
             output_path=str(out),
             assets=assets,
         )
+        logger.info(f"[scheduler] 每日总结卡片已渲染：{out.name}")
         return str(out)
     except Exception as e:  # noqa: BLE001
         logger.info(f"[scheduler] 总结卡片渲染失败: {e}")
@@ -426,7 +433,7 @@ async def run_weekly_task(plugin: Any, context: Any, cfg: dict) -> None:
                 image_path = await render_weekly_card(plugin, end=today)
 
             if image_path:
-                logger.info(f"[scheduler] 每周总结卡片已渲染：{week['start']} ~ {week['end']}，{week['total_checkins']} 首")
+                logger.info(f"[scheduler] 每周总结卡片已渲染（截至 {today.isoformat()}）")
                 sent, failed = await broadcast_image(plugin, context, groups, image_path)
                 logger.info(f"[scheduler] 每周总结已发送：成功 {len(sent)} 群，失败 {len(failed)} 群")
                 if failed:

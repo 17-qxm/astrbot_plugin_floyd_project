@@ -61,7 +61,13 @@ class FloydPlugin(Star):
         # WebAPI（在 initialize 注册，确保 context 就绪；这里先持有实例）。
         self._web_api = web_api.WebAPI(self)
 
+        # 定时任务在 __init__ 创建（与 old 版本一致，避免 initialize 时机问题）。
         self._tasks: list[asyncio.Task] = []
+        cfg = self._scheduler_cfg()
+        self._tasks.append(asyncio.create_task(scheduler_mod.run_push_task(self, self.context, cfg, self.challenge_mgr)))
+        self._tasks.append(asyncio.create_task(scheduler_mod.run_summary_task(self, self.context, cfg, self.checkin_store)))
+        self._tasks.append(asyncio.create_task(scheduler_mod.run_weekly_task(self, self.context, cfg)))
+        logger.info("[floyd] 定时任务已启动（推歌 / 每日总结 / 每周总结）")
 
     def _resolve_data_dir(self) -> Path:
         """优先用 AstrBot 的插件数据目录；取不到则回落到插件目录下的 data/。"""
@@ -96,13 +102,6 @@ class FloydPlugin(Star):
             logger.info("[floyd] WebUI 路由已注册")
         except Exception as e:  # noqa: BLE001 — register_web_api 在低版本可能不存在
             logger.info(f"[floyd] WebUI 路由注册失败（可能 AstrBot 版本不支持）: {e}")
-
-        # 启动定时任务。
-        cfg = self._scheduler_cfg()
-        self._tasks.append(asyncio.create_task(scheduler_mod.run_push_task(self, self.context, cfg, self.challenge_mgr)))
-        self._tasks.append(asyncio.create_task(scheduler_mod.run_summary_task(self, self.context, cfg, self.checkin_store)))
-        self._tasks.append(asyncio.create_task(scheduler_mod.run_weekly_task(self, self.context, cfg)))
-        logger.info("[floyd] 定时任务已启动（推歌 / 每日总结 / 每周总结）")
 
     def _scheduler_cfg(self) -> dict:
         start_date = challenge_mod.parse_start_date(self.config.get("challenge_start_date", ""))
@@ -241,6 +240,7 @@ class FloydPlugin(Star):
     @filter.command("summary")
     async def summary(self, event: AstrMessageEvent):
         """手动查看当日打卡总结。"""
+        logger.info(f"[floyd] /summary 由 {event.get_sender_name()} 触发")
         cfg = self._scheduler_cfg()
         if cfg.get("auto_summary_image"):
             today = date.today()
@@ -249,8 +249,12 @@ class FloydPlugin(Star):
             stats = await self.checkin_store.get_stats()
             image_path = await scheduler_mod._render_summary_card(self, today, checkins, stats)
             if image_path:
+                logger.info(f"[floyd] /summary 发送图片：{image_path}")
                 yield event.image_result(image_path)
                 return
+            logger.info("[floyd] /summary 图片渲染失败，回落纯文本")
+        else:
+            logger.info("[floyd] /summary auto_summary_image 关闭，发送纯文本")
         # 图片渲染失败或关闭时，回落纯文本
         yield event.plain_result(await scheduler_mod.build_summary_text(self.checkin_store))
 
