@@ -1,5 +1,31 @@
 # 更新日志
 
+## v0.5.0
+
+### 新增 — 多平台分享卡片
+- 新增 `platforms.py` 统一解析/分发层：`extract_shares(text)` 从一条消息全提取分享（去重、上限 5 个），按平台分发 `fetch_detail` / `download_cover`
+- 支持平台：
+  - **网易云** 单曲（原有）
+  - **B站视频**：BV 号 / av 号 / b23.tv 短链，走 `x/web-interface/view` 免登录接口；卡片 meta 行为「分区 · 时长 · 播放量」
+  - **QQ音乐** 单曲：`fcg_play_single_song.fcg`，songmid 只从明确上下文提取（`songDetail/`、`songmid=`、`y.qq.com` 域名）
+  - **酷狗** 单曲：`getSongInfo.php`，`imgUrl` 为空（虚拟歌手等）时兜底 `album_img` 专辑封面
+  - **酷狗专辑**：真实分享是 `t1.kugou.com/album.html?id=<编码串>` 短链 → 移动 UA 解析跳转页内联 `phpParam` 取数字 albumid → mobilecdn v3 `album/info` + `album/song` 接口（仅 HTTP）
+- 新专辑卡片 `render_album_card`：220px 封面 + 专辑名/歌手/共 N 首 + 半透明曲目面板（≤6 行 + 「……共 N 首」）+ 推荐人条；徽标/推荐人条抽成 `_draw_platform_badge` / `_draw_recommender_bar` 供单曲卡与专辑卡共用
+- 单曲卡左上角新增平台徽标；长文本单行截断防溢出
+- 一条消息多个分享 → 逐个出卡、逐个打卡，失败汇总为一条回复
+- 打卡记录新增 `platform` 字段，`song_id` 类型放宽（兼容 BV 号/hash/songmid）
+- 平台识别优先级：B站 > QQ音乐 > 酷狗 > 网易云（网易云泛 `id=` 规则最松，放最后）
+
+### 修复
+- QQ音乐宽松 songmid 规则误伤网易云：网易云分享卡片 JSON 内含 `songmid` 字段曾被误判为 QQ音乐导致出卡失败 → 删除裸字符串规则，只认明确上下文
+- `y.qq.com` 泛链接规则会把 URL 路径词（如 `songDetail`）吞成歌曲 id → 捕获组改为须数字开头
+- 酷狗单曲分享 JSON 内嵌所属专辑泛链接导致一首歌出两张卡 → 命中单曲 hash 或 t1 短链时放弃泛链接
+
+### 调试
+- `debug_messages.log`：记录未识别消息与出卡失败详情（完整分享 blob，截断 1200 字符），便于文件侧排查
+
+> 注：上游 v0.4.0 未写更新日志，本条为 v0.4.0 之后的首个记录条目。
+
 ## v0.3.0
 
 ### 重构
