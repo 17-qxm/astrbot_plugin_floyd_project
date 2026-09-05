@@ -44,17 +44,19 @@ class CheckinStore:
         sender_id: str,
         sender_name: str,
         *,
+        platform: str = "netease",
         song: str,
         artist: str,
         cover_url: str = "",
-        song_id: Optional[int] = None,
+        song_id: Optional[Any] = None,
         album: str = "",
         today: Optional[date] = None,
     ) -> bool:
         """记录一次打卡。每人每天最多一次，重复返回 False。
 
         Args:
-            song / artist / cover_url / song_id / album: 本次分享的歌曲信息。
+            platform: 内容来源平台（netease / bilibili / qqmusic / kugou）。
+            song / artist / cover_url / song_id / album: 本次分享的内容信息。
             cover_url 用于每日总结里的封面模糊背景。
         Returns:
             本次是否为新打卡（True）或当天已打过（False）。
@@ -68,6 +70,7 @@ class CheckinStore:
             day[sender_id] = {
                 "uid": sender_id,
                 "name": sender_name,
+                "platform": platform,
                 "song": song,
                 "artist": artist,
                 "cover_url": cover_url or "",

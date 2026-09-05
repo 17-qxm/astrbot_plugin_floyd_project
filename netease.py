@@ -35,18 +35,29 @@ _AVATAR_HEADERS = {
 }
 
 
+def extract_song_ids(text: Optional[str]) -> list[int]:
+    """从任意字符串（消息对象 repr / CQ 码 / 纯 URL）中提取全部网易云歌曲 id。
+
+    按模式优先级去重返回；无匹配返回空列表。
+    """
+    if not text:
+        return []
+    ids: list[int] = []
+    for pat in _ID_PATTERNS:
+        for m in pat.finditer(text):
+            v = int(m.group(1))
+            if v not in ids:
+                ids.append(v)
+    return ids
+
+
 def extract_song_id(text: Optional[str]) -> Optional[int]:
     """从任意字符串（消息对象 repr / CQ 码 / 纯 URL）中提取网易云歌曲 id。
 
     返回 int；无法识别时返回 None。
     """
-    if not text:
-        return None
-    for pat in _ID_PATTERNS:
-        m = pat.search(text)
-        if m:
-            return int(m.group(1))
-    return None
+    ids = extract_song_ids(text)
+    return ids[0] if ids else None
 
 
 async def fetch_song_detail(song_id: int, *, timeout: int = 10) -> dict:

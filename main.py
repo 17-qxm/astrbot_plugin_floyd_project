@@ -31,9 +31,9 @@ import ai_generator
 import card_service
 import challenge as challenge_mod
 import checkin as checkin_mod
+import platforms
 import scheduler as scheduler_mod
 from webui import web_api
-from netease import extract_song_id
 
 PLUGIN_NAME = "astrbot_plugin_floyd_project"
 CARD_OUTPUT_DIR = _CURRENT_DIR / "card_cache"
@@ -147,7 +147,7 @@ class FloydPlugin(Star):
     # ---------- 群消息：卡片识别 + 打卡 ----------
     @filter.event_message_type(filter.EventMessageType.GROUP_MESSAGE)
     async def on_group_message(self, event: AstrMessageEvent):
-        """处理群消息：缓存 umo；若是网易云分享则生成卡片并打卡。"""
+        """处理群消息：缓存 umo；若是音乐/视频平台分享则生成卡片并打卡。"""
         group_id = event.get_group_id() or ""
 
         # 缓存 umo（跨平台推送用），任何群消息都记一次。
@@ -157,43 +157,73 @@ class FloydPlugin(Star):
         if not is_checkin_group:
             return
 
-        song_id = self._extract_song_id_from_event(event)
-        if not song_id:
+        shares, blob = self._extract_shares_from_event(event)
+        if not shares:
+            # 文件日志：记录完整消息文本（Json 卡片组件不在 message_str 里），便于排查平台分享格式。
+            try:
+                dbg = _CURRENT_DIR / "debug_messages.log"
+                with open(dbg, "a", encoding="utf-8") as f:
+                    f.write(f"[{__import__('datetime').datetime.now().isoformat()}] 未识别 群={group_id} "
+                            f"blob={blob[:1200]}\n")
+            except Exception:  # noqa: BLE001
+                pass
+            logger.info(f"[floyd] 未识别分享（群={group_id}）")
             return
+        logger.info(f"[floyd] 识别到 {len(shares)} 个分享：{shares}")
 
         sender_id = event.get_sender_id()
         sender_name = event.get_sender_name()
-        logger.info(f"[floyd] 收到网易云分享：群={group_id} 用户={sender_name}({sender_id}) 歌曲id={song_id}")
-        result = await card_service.generate_song_card(
-            song_id,
-            recommender=sender_name,
-            recommender_qq=sender_id,
-            output_dir=CARD_OUTPUT_DIR,
-        )
-        if not result:
-            yield event.plain_result("歌曲卡片生成失败，可能歌曲已下架或网络异常。")
-            return
+        failed = 0
+        for platform, resource_id in shares:
+            logger.info(f"[floyd] 收到分享：群={group_id} 用户={sender_name}({sender_id}) "
+                        f"平台={platform} id={resource_id}")
+            result = await card_service.generate_share_card(
+                platform,
+                resource_id,
+                recommender=sender_name,
+                recommender_qq=sender_id,
+                output_dir=CARD_OUTPUT_DIR,
+            )
+            if not result:
+                failed += 1
+                # 文件日志：记录失败信息，便于排查平台接口变化。
+                try:
+                    dbg = _CURRENT_DIR / "debug_messages.log"
+                    with open(dbg, "a", encoding="utf-8") as f:
+                        f.write(f"[{__import__('datetime').datetime.now().isoformat()}] 卡片失败 platform={platform} id={resource_id} "
+                                f"blob={blob[:300]}\n")
+                except Exception:  # noqa: BLE001
+                    pass
+                continue
 
-        logger.info(f"[floyd] 卡片生成完成：{result['song'].get('name','?')} - {result['song'].get('artists','?')}")
-        yield event.image_result(result["path"])
+            logger.info(f"[floyd] 卡片生成完成：{result['song'].get('name','?')} - {result['song'].get('artists','?')}")
+            yield event.image_result(result["path"])
 
-        # 卡片成功生成才算打卡。
-        song = result["song"]
-        is_new = await self.checkin_store.checkin(
-            sender_id, sender_name,
-            song=song.get("name", ""),
-            artist=song.get("artists", ""),
-            cover_url=song.get("cover_url", ""),
-            song_id=song.get("id"),
-            album=song.get("album", ""),
-        )
-        if not is_new:
-            logger.info(f"[floyd] {sender_id} 今日已打卡，重复分享不累计")
-        else:
-            logger.info(f"[floyd] 打卡成功：{sender_name}({sender_id}) - 《{song.get('name','?')}》")
+            # 卡片成功生成才算打卡。
+            song = result["song"]
+            is_new = await self.checkin_store.checkin(
+                sender_id, sender_name,
+                platform=platform,
+                song=song.get("name", ""),
+                artist=song.get("artists", ""),
+                cover_url=song.get("cover_url", ""),
+                song_id=song.get("id"),
+                album=song.get("album", ""),
+            )
+            if not is_new:
+                logger.info(f"[floyd] {sender_id} 今日已打卡，重复分享不累计")
+            else:
+                logger.info(f"[floyd] 打卡成功：{sender_name}({sender_id}) - 《{song.get('name','?')}》")
 
-    def _extract_song_id_from_event(self, event: AstrMessageEvent) -> Optional[int]:
-        """从消息组件里提取网易云歌曲 id（兼容 Json 卡片与纯文本 URL）。"""
+        if failed:
+            yield event.plain_result(
+                "分享卡片生成失败，可能内容已下架或网络异常。"
+                if failed == len(shares)
+                else f"{failed} 张分享卡片生成失败，可能内容已下架或网络异常。"
+            )
+
+    def _extract_shares_from_event(self, event: AstrMessageEvent) -> tuple[list[tuple[str, str]], str]:
+        """从消息组件里提取全部 (平台, 资源id)（兼容 Json 卡片与纯文本 URL），返回 (shares, blob)。"""
         message = getattr(getattr(event, "message_obj", None), "message", None) or []
         blob_parts: list[str] = []
         for comp in message:
@@ -207,7 +237,8 @@ class FloydPlugin(Star):
             blob_parts.append(str(comp))
         # 再补一层 message_str（部分适配器把链接放这里）。
         blob_parts.append(getattr(event, "message_str", "") or "")
-        return extract_song_id("\n".join(blob_parts))
+        blob = "\n".join(blob_parts)
+        return platforms.extract_shares(blob), blob
 
     # ---------- 指令 ----------
     @filter.command("forcepush")
