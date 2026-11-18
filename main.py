@@ -23,6 +23,23 @@ _CURRENT_DIR = Path(__file__).resolve().parent
 if str(_CURRENT_DIR) not in sys.path:
     sys.path.insert(0, str(_CURRENT_DIR))
 
+# 热更新防混跑：WebUI 更新插件文件后「重载插件」只重新加载入口 main.py，
+# 平铺导入的子模块（card_service 等）会命中 sys.modules 里的旧缓存，
+# 造成「新 main.py + 旧 card_service」混用（如签名不一致 TypeError）。
+# 这里在导入前清掉**本插件目录内**的旧子模块缓存，让重载后全部按新文件导入。
+_PLUGIN_SUBMODULES = (
+    "ai_generator", "avatar", "card_service", "challenge", "checkin",
+    "imagecreate", "platforms", "scheduler", "webui", "netease",
+)
+for _name in _PLUGIN_SUBMODULES:
+    _mod = sys.modules.get(_name)
+    _mod_file = str(getattr(_mod, "__file__", "") or "")
+    if _mod and _mod_file and Path(_mod_file).resolve().is_relative_to(_CURRENT_DIR):
+        del sys.modules[_name]
+        # 一并清掉包内子模块（imagecreate.xxx / webui.xxx）
+        for _sub in [k for k in sys.modules if k.startswith(_name + ".")]:
+            del sys.modules[_sub]
+
 from astrbot.api import logger
 from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
