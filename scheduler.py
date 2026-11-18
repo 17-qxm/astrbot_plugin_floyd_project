@@ -243,33 +243,49 @@ async def run_summary_task(
             await asyncio.sleep(300)
 
 
-async def _safe_download(coro_func, *args) -> Optional[bytes]:
+async def _safe_download(coro_func, *args, **kwargs) -> Optional[bytes]:
     """安全执行下载协程，失败返回 None（不影响整体渲染）。"""
     try:
-        return await coro_func(*args)
+        return await coro_func(*args, **kwargs)
     except Exception as e:  # noqa: BLE001
         logger.info(f"[scheduler] 资源下载失败 ({coro_func.__name__}): {e}")
         return None
 
 
-async def _download_assets(checkins: list, cover_key_prefix: str = "cover") -> dict:
+async def _download_assets(checkins: list, plugin: Any = None, cover_key_prefix: str = "cover") -> dict:
     """并发下载一批打卡记录的封面 + 头像。
 
     封面 key: ``{prefix}_{i}``（i 为 checkins 内索引）；
     头像 key: ``uid``（去重）。
+    头像来源：打卡记录里存的 ``avatar_url``（事件下发）优先，thirdqq 按 openid 兜底。
     单个失败返回 None，渲染层用占位圆/纯色兜底。
     """
     import netease
+    import avatar as avatar_mod
+
+    appid = avatar_mod.get_qqofficial_appid(plugin.context) if plugin else ""
 
     async def _cover(i, url):
         return (f"{cover_key_prefix}_{i}", await _safe_download(netease.download_cover, url))
 
-    async def _avatar(uid):
-        return (uid, await _safe_download(netease.download_qq_avatar, uid))
+    async def _avatar(c):
+        uid = c.get("uid", "")
+        return (uid, await _safe_download(
+            avatar_mod.fetch_user_avatar,
+            avatar_url=c.get("avatar_url", ""),
+            openid=uid,
+            appid=appid,
+        ))
 
     cover_jobs = [_cover(i, c["cover_url"]) for i, c in enumerate(checkins) if c.get("cover_url")]
-    uids = {c.get("uid") for c in checkins if c.get("uid")}
-    avatar_jobs = [_avatar(uid) for uid in uids]
+    # uid 去重：同一人多条记录只拉一次头像。
+    seen_uids: set = set()
+    avatar_jobs = []
+    for c in checkins:
+        uid = c.get("uid", "")
+        if uid and uid not in seen_uids:
+            seen_uids.add(uid)
+            avatar_jobs.append(_avatar(c))
 
     pairs = await asyncio.gather(*cover_jobs, *avatar_jobs, return_exceptions=True)
     assets: dict = {}
@@ -277,8 +293,9 @@ async def _download_assets(checkins: list, cover_key_prefix: str = "cover") -> d
         if isinstance(p, Exception):
             continue
         k, b = p
-        # 头像结果区分：key 是 uid → avatar；封面 key 含 prefix → cover
-        if k.startswith(cover_key_prefix):
+        # 封面 key 形如 "{prefix}_{数字}"；其余视为 uid → avatar。
+        prefix_str = f"{cover_key_prefix}_"
+        if k.startswith(prefix_str) and k[len(prefix_str):].isdigit():
             assets[k] = {"cover": b}
         else:
             assets[k] = {"avatar": b}
@@ -296,7 +313,7 @@ async def _render_summary_card(
     from imagecreate import summary_renderer as sr
     try:
         logger.info(f"[scheduler] 开始渲染每日总结：{len(checkins)} 首歌")
-        assets = await _download_assets(checkins)
+        assets = await _download_assets(checkins, plugin)
         logger.info(f"[scheduler] 资源下载完成：{len(assets)} 项")
         out = CARD_CACHE_DIR / f"summary_{today.isoformat()}_{uuid.uuid4().hex[:8]}.png"
         out.parent.mkdir(parents=True, exist_ok=True)
@@ -350,7 +367,7 @@ async def render_weekly_card(plugin: Any, *, end: Optional[date] = None) -> Opti
         # 封面 key: d{di}_cover_{ci}；头像 key: uid（去重，全局复用）。
         all_checkins = [c for day in days for c in day.get("checkins", [])]
         # 用全局 prefix 占位，下载完按 d{di}_cover_{ci} 重建 key
-        flat_assets = await _download_assets(all_checkins, cover_key_prefix="flat")
+        flat_assets = await _download_assets(all_checkins, plugin, cover_key_prefix="flat")
 
         # 重建带天索引的 assets
         assets: dict = {}

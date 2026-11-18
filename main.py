@@ -28,6 +28,7 @@ from astrbot.api.event import AstrMessageEvent, filter
 from astrbot.api.star import Context, Star, register
 
 import ai_generator
+import avatar as avatar_mod
 import card_service
 import challenge as challenge_mod
 import checkin as checkin_mod
@@ -172,7 +173,19 @@ class FloydPlugin(Star):
         logger.info(f"[floyd] 识别到 {len(shares)} 个分享：{shares}")
 
         sender_id = event.get_sender_id()
-        sender_name = event.get_sender_name()
+        # qq_official：从事件原始 payload 提取群昵称与头像 URL（2026-11-16 官方新增字段）。
+        author = avatar_mod.extract_event_author(event)
+        sender_name = (
+            author.get("member_nickname")
+            or author.get("username")
+            or event.get_sender_name()
+            or sender_id
+        )
+        avatar_url = author.get("avatar", "")
+        qqofficial_appid = avatar_mod.get_qqofficial_appid(self.context)
+        if qqofficial_appid:
+            logger.info(f"[floyd] qq_official AppID: {qqofficial_appid}（头像兜底用）")
+
         failed = 0
         for platform, resource_id in shares:
             logger.info(f"[floyd] 收到分享：群={group_id} 用户={sender_name}({sender_id}) "
@@ -181,7 +194,9 @@ class FloydPlugin(Star):
                 platform,
                 resource_id,
                 recommender=sender_name,
-                recommender_qq=sender_id,
+                recommender_id=sender_id,
+                avatar_url=avatar_url,
+                qqofficial_appid=qqofficial_appid,
                 output_dir=CARD_OUTPUT_DIR,
             )
             if not result:
@@ -209,6 +224,7 @@ class FloydPlugin(Star):
                 cover_url=song.get("cover_url", ""),
                 song_id=song.get("id"),
                 album=song.get("album", ""),
+                avatar_url=avatar_url,
             )
             if not is_new:
                 logger.info(f"[floyd] {sender_id} 今日已打卡，重复分享不累计")
@@ -343,4 +359,25 @@ class FloydPlugin(Star):
         for i, u in enumerate(rank, 1):
             medal = "🥇🥈🥉"[i - 1] if i <= 3 else f"{i}."
             lines.append(f"{medal} {u.get('name', u.get('user_id', '?'))} — {u.get('total', 0)} 次")
+        yield event.plain_result("\n".join(lines))
+
+    @filter.command("floyddebug")
+    async def floyddebug(self, event: AstrMessageEvent):
+        """诊断头像链路：显示 AppID、发送人 openid 与事件 author 原始字段。"""
+        appid = avatar_mod.get_qqofficial_appid(self.context)
+        sender_id = event.get_sender_id()
+        author = avatar_mod.extract_event_author(event)
+        avatar_url = author.get("avatar", "")
+        avatar_bytes = await avatar_mod.fetch_user_avatar(
+            avatar_url=avatar_url, openid=sender_id, appid=appid,
+        )
+        lines = [
+            f"AppID: {appid or '（未找到 qq_official 平台实例）'}",
+            f"sender_id(openid): {sender_id or '(空)'}",
+            "author 原始字段: "
+            + (json.dumps(author, ensure_ascii=False) if author else "（事件未携带 / 非 qq_official 平台）"),
+            f"avatar 字段: {avatar_url or '（事件未下发头像 URL，将走 thirdqq 兜底）'}",
+            "头像获取: " + (f"成功 {len(avatar_bytes)}B" if avatar_bytes else "失败（渲染时走首字母占位圆）"),
+        ]
+        logger.info(f"[floyd] /floyddebug: appid={appid} sender={sender_id} author={author}")
         yield event.plain_result("\n".join(lines))

@@ -4,7 +4,10 @@
 所有函数：
 - ``extract_song_id``：从任意字符串提取歌曲 id（纯 CPU，无需 await）。
 - ``fetch_song_detail``：走网易云 web 端接口取歌曲详情。
-- ``download_cover`` / ``download_qq_avatar``：下载二进制图片。
+- ``download_cover``：下载封面二进制。
+
+头像获取已迁至 ``avatar.py``（官方机器人平台按 openid 取头像），
+q.qlogo.cn 按 QQ 号取头像的旧链路对 qq_official 无效，已删除。
 """
 
 from __future__ import annotations
@@ -28,11 +31,6 @@ _ID_PATTERNS = [
     re.compile(r"(?:song|url)\?id=(\d+)"),
     re.compile(r"[?&]id=(\d+)"),
 ]
-
-# QQ 头像服务（q.qlogo.cn）用于卡片底部「推荐人」头像。
-_AVATAR_HEADERS = {
-    "User-Agent": HEADERS["User-Agent"],
-}
 
 
 def extract_song_ids(text: Optional[str]) -> list[int]:
@@ -106,13 +104,5 @@ async def download_cover(url: str, *, timeout: int = 15) -> bytes:
         return await _get_bytes(session, url, timeout=timeout)
 
 
-async def download_qq_avatar(qq: str, *, timeout: int = 10) -> Optional[bytes]:
-    """通过 QQ 号获取高清头像，返回图片字节；失败时返回 None（不抛错）。"""
-    if not qq:
-        return None
-    url = f"https://q.qlogo.cn/headimg_dl?dst_uin={qq}&spec=640&img_type=jpg"
-    try:
-        async with aiohttp.ClientSession(headers=_AVATAR_HEADERS) as session:
-            return await _get_bytes(session, url, timeout=timeout)
-    except (aiohttp.ClientError, ValueError):
-        return None
+# download_qq_avatar 已删除：q.qlogo.cn 只认真实数字 QQ 号，
+# qq_official 下 sender_id 是 member_openid。头像获取见 avatar.py。

@@ -14,6 +14,7 @@ from typing import Optional
 from astrbot.api import logger
 
 import platforms
+import avatar as avatar_mod
 from imagecreate.card_renderer import render_album_card, render_card
 
 PLUGIN_DIR = Path(__file__).resolve().parent
@@ -24,7 +25,9 @@ async def generate_share_card(
     resource_id: str,
     *,
     recommender: Optional[str] = None,
-    recommender_qq: Optional[str] = None,
+    recommender_id: Optional[str] = None,
+    avatar_url: str = "",
+    qqofficial_appid: str = "",
     output_dir: Path,
 ) -> Optional[dict]:
     """生成一张分享卡片。
@@ -33,7 +36,9 @@ async def generate_share_card(
         platform: 平台标识（netease / bilibili / qqmusic / kugou）。
         resource_id: 平台资源 id（网易云歌曲 id / B站 BV号 / QQ音乐 songmid / 酷狗 hash）。
         recommender: 推荐人昵称（卡片底部显示）。
-        recommender_qq: 推荐人 QQ 号（用于拉头像）。
+        recommender_id: 推荐人标识（qq_official 下为 member_openid），thirdqq 兜底用。
+        avatar_url: 事件 author.avatar 下发的头像 URL（最优来源）。
+        qqofficial_appid: 机器人 AppID，thirdqq 兜底用。
         output_dir: PNG 输出目录，调用方应保证已存在。
 
     Returns:
@@ -47,7 +52,11 @@ async def generate_share_card(
         logger.info(f"[musiccard] 获取分享信息失败 (platform={platform} id={resource_id}): {e}")
         return None
 
-    avatar = await platforms.download_qq_avatar(recommender_qq) if recommender_qq else None
+    avatar = await avatar_mod.fetch_user_avatar(
+        avatar_url=avatar_url,
+        openid=recommender_id or "",
+        appid=qqofficial_appid,
+    )
 
     output_path = output_dir / f"share_{platform}_{resource_id[:16]}_{uuid.uuid4().hex[:8]}.png"
     font = None  # 让 card_renderer._find_font 自行探测同目录字体

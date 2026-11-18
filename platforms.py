@@ -317,6 +317,4 @@ async def download_cover(platform: str, url: str, *, timeout: int = 15) -> bytes
             return await resp.read()
 
 
-async def download_qq_avatar(qq: str, *, timeout: int = 10) -> Optional[bytes]:
-    """通过 QQ 号获取高清头像（转发 netease 的实现）。"""
-    return await netease.download_qq_avatar(qq, timeout=timeout)
+# download_qq_avatar 转发已删除：头像获取统一走 avatar.py（官方机器人按 openid）。
